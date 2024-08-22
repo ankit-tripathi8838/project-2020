@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-replication-config
+  namespace: pg 
+data:
+  PRIMARY_DB_HOST: postgres-primary
+  PRIMARY_DB_PORT: "5432"
+  PRIMARY_DB_USER: postgres
+  PRIMARY_DB_NAME: mydatabase
+  SECONDARY_DB_HOST: postgres-secondary
+  SECONDARY_DB_PORT: "5432"
+  SECONDARY_DB_USER: user
+  SECONDARY_DB_NAME: mydb 
+  REPLICATION_USER: replication_user
+  REPLICATION_PASSWORD: replication_password
+  POSTGRES_WAL_LEVEL: replica
+  POSTGRES_MAX_WAL_SENDERS: "10"
+  POSTGRES_WAL_KEEP_SEGMENTS: "64"
+  POSTGRES_ARCHIVE_MODE: on
+  POSTGRES_ARCHIVE_COMMAND: /bin/true
+  POSTGRES_HOT_STANDBY: on
+#recovery configuration
+  RECOVERY_TARGET_TIMELINE: "latest"
+
+#script to setup replication
+  INIT_REPLICATION_SCRIPT: |
+   #!/bin/bash
+   echo "Starting base backup for replication..."
+   PGPASSWORD=$REPLICATION_PASSWORD pg_basebackup -h $PRIMARY_DB_HOST -D /var/lib/pgsql/data -U $REPLICATION_USER -vP --wal-method=stream
+   echo "Base backup completed."
+   echo "Creating recovery.conf for streaming replication..."
+   echo "standby_mode = 'on'" > /var/lib/pgsql/data/recovery.conf
+   echo "primary_conninfo = 'host=$PRIMARY_DB_HOST port=$PRIMARY_DB_PORT user=$REPLICATION_USER password=$REPLICATION_PASSWORD'" >> /var/lib/pgsql/data/recovery.conf
+   echo "recovery_target_timeline = 'latest'" >> /var/lib/pgsql/data/recovery.conf
+   echo "Trigger file setup done."
+   echo "Replication setup completed."
